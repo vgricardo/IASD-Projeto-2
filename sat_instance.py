@@ -321,7 +321,7 @@ class SATInstance:
             for i in range(0, len(action_table)):
 
                 # build at least one constraint
-                action_1 = "_".join(('-' + action_table[i], str(t)))
+                action_1 = "_".join((action_table[i], str(t)))
                 clause_or.append(action_1)
 
                 # build and add at max one constraint
@@ -329,7 +329,7 @@ class SATInstance:
                     action_2 = "_".join(('-' + action_table[j], str(t)))
 
                     # create new clause and add to SAT sentence
-                    clause = sorted([action_1, action_2])
+                    clause = sorted(['-' + action_1, action_2])
                     sentence.append(clause)
 
             sentence.append(clause_or)  # add at least one constraint
