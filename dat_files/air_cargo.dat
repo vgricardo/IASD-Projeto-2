@@ -1,0 +1,9 @@
+I	At(C1,SFO)		At(C2,JFK)		At(P1,SFO) 	At(P2,JFK) 	Cargo(C1) 	Cargo(C2) 	Plane(P1) 	Plane(P2)	Airport(JFK)	Airport(SFO)
+
+G 	At(C1,JFK) 	At(C2,SFO)
+
+A 	Load(c,p,a):	At(c,a)	At(p,a)	Cargo(c)	Plane(p)		Airport(a)	->		-At(c,a)		In(c,p)
+
+A 	Unload(c,p,a):	In(c,p)	At(p,a)	Cargo(c)	Plane(p)		Airport(a)	->		At(c,a)	-In(c,p)
+
+A 	Fly(p,from,to):	At(p,from)	Plane(p)		Airport(from)	Airport(to)		->		-At(p,from)		At(p,to)

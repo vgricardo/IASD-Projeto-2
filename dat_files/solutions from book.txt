@@ -1,0 +1,9 @@
+Air cargo:
+Load (C1, P1, SFO), Fly(P1, SFO, JFK),Unload(C1, P1, JFK),
+Load (C2, P2, JFK), Fly(P2, JFK, SFO),Unload(C2, P2, SFO)
+
+Blocks:
+MoveToTable(A, B), Move(B, C, A), Move(C, Table, B)
+
+Spare Tire:
+Remove(Flat , Axle), Remove(Spare, Trunk ), PutOn(Spare, Axle)
