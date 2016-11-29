@@ -1,5 +1,5 @@
-A codificação usada foi tirada de:
+Linear encoding feito e ficheiro DIMACS criado.
 
-http://sahandsaba.com/understanding-sat-by-implementing-a-simple-sat-solver-in-python.html
+Falta fazer o PDDL solver para ter a solução.
 
-No link explica e implementa um SAT problem
+Depois é escolher melhorias para os algoritmos, tirando a informação dos papaers na pasta Documents.
