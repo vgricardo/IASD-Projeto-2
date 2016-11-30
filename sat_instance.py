@@ -363,6 +363,9 @@ class SATInstance:
 
         # write problem line
         f.write(('p cnf \t %d \t %d \n' % (variables, clauses)))
+        f.write('c \n')
+        f.write('c Clauses\n')
+        f.write('c \n')
 
         output = ''
         # write clauses
