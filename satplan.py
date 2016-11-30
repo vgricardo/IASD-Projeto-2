@@ -20,7 +20,7 @@ def main(arg1):
 
     # Linear encoding
     h = 3   # time horizon
-    print_terminal = False   # print SAT sentence to terminal
+    print_terminal = True   # print SAT sentence to terminal
     sentence = sat.linear_encoding(h, print_terminal)
 
     # Write SAT sentence to file using DIMACS syntax

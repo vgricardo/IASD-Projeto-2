@@ -258,7 +258,7 @@ class SATInstance:
                         sentence.append(clause)
 
                 for effect in action[1]:  # adding clauses with effects
-                    effect = "_".join((effect, str(t)))
+                    effect = "_".join((effect, str(t+1)))
                     clause = sorted([action_neg, effect])
 
                     if clause not in sentence:  # add clause if necessary
@@ -364,6 +364,7 @@ class SATInstance:
         # write problem line
         f.write(('p cnf \t %d \t %d \n' % (variables, clauses)))
 
+        output = ''
         # write clauses
         for clause in sentence:
 
@@ -385,9 +386,9 @@ class SATInstance:
                         string = ' '.join((string, sign + str(i+1)))
                         break
 
-            # write clause to file
-            f.write((string[1:] + ' 0\n'))
+            # add clause to output
+            output = ''.join((output, string[1:] + ' 0\n'))
 
+        # write output and close file
+        f.write(output)
         f.close()
-
-        print('efwererg')
