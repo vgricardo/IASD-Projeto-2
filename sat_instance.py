@@ -389,3 +389,5 @@ class SATInstance:
             f.write((string[1:] + ' 0\n'))
 
         f.close()
+
+        print('efwererg')
