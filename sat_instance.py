@@ -366,6 +366,7 @@ class SATInstance:
         f.write('c \n')
         f.write('c Clauses\n')
         f.write('c \n')
+        f.write('c \n')
 
         output = ''
         # write clauses
