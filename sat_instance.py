@@ -114,7 +114,7 @@ class SATInstance:
         for t in range(0, h):
             self.variables.append((atom, t))
 
-            # ----------------------------------------------------------------------------------------------------------------------
+        # ----------------------------------------------------------------------------------------------------------------------
 
     '''Routine that adds the action's effects and preconditions to a dictionary'''
     def add_action(self, atoms):
