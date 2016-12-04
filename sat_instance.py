@@ -13,13 +13,15 @@ class SATInstance:
         self.action_table = dict()  # dictionary that will save the actions preconditions and effects
         self.initial_state = []  # saves the initial state atoms
         self.goal_state = []  # saves the goal states atoms
-        self.hebrand = []   # saves the hebrand base
+        self.hebrand = []  # saves the hebrand base
+        self.variables = [None]  # keeps the information of problem's variables
 
 # ----------------------------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
     '''Routine to read the information from .dat file'''
-    def read_file(self, filename):
+
+    def read_file(self, filename, h):
 
         with open(filename, 'r') as fh:
 
@@ -27,63 +29,69 @@ class SATInstance:
                 atoms = line.split()  # split read line in words
                 if len(atoms) != 0:
 
-                    atoms = self.add_constants(atoms)  # add constants to constant list and encode atoms
-
                     if atoms[0] == 'I':  # line with initial state
-                        self.initial_state = atoms[1:]  # save initial state
+                        for i in range(1, len(atoms)):
+                            self.add_constants(atoms[i])  # get constants from atom
+                            indices = self.add_hebrand(atoms[i], h + 1)  # add atom to hebrand base
+                            self.initial_state.append([indices[0]])  # save variable id, accounting for atom sign
 
                     elif atoms[0] == 'G':  # line with goal state
-                        self.goal_state = atoms[1:]  # save goal state
+                        for i in range(1, len(atoms)):
+                            self.add_constants(atoms[i])  # get constants from atom
+                            indices = self.add_hebrand(atoms[i], h + 1)  # add atom to hebrand base
+
+                            self.goal_state.append([indices[-1]])  # save variable id, accounting for atom sign
 
                     elif atoms[0] == 'A':  # line with an action description
+                        atoms[1] = atoms[1][:-1]  # delete ':' sign in the action name
                         self.add_action(atoms[1:])  # adds the action's preconditions and effects to dictionary table
 
 # ----------------------------------------------------------------------------------------------------------------------
 
     '''Routine that adds the constants in the problem's domain'''
-    def add_constants(self, atoms):
 
-        # auxiliary variable to check if is initial or goal state
-        add = False
+    def add_constants(self, atom):
 
-        if atoms[0] == 'A':  # delete ':' sign in the action name
-            atoms[1] = atoms[1][:-1]
-        else:
-            add = True  # used to decide if necessary to add to Hebrand base
+        atom = self.encode_atom(atom)
+        terms = atom.split()  # split atom in terms
 
-        for ind in range(len(atoms[1:]) + 1):
+        constants = self.constants
+        # check if they already exist or add constant if necessary, variables are ignored
+        for term in terms[1:]:
+            if term not in constants and not term.islower() and term.isalnum():
+                constants.append(term)
 
-            if atoms[ind][-1] == '>':  # skip -> sign because it is an action
-                continue
+            # ----------------------------------------------------------------------------------------------------------------------
 
-            atoms[ind] = self.encode_atom(atoms[ind])
-            if add and ind > 0:  # is initial or goal state
-                self.add_hebrand(atoms[ind])    # add atom to Hebrand base
+    '''Function that adds atom to hebrand base and variable list if necessary'''
 
-            terms = atoms[ind].split()
+    def add_hebrand(self, atom, h):
 
-            constants = self.constants
-            # check if they already exist or add constant if necessary, variables are ignored
-            for term in terms[1:]:
-                if term not in constants and not term.islower() and term.isalnum():
-                    constants.append(term)
-
-        return atoms
-
-# ----------------------------------------------------------------------------------------------------------------------
-
-    '''Function that adds atom to Hebrand base if necessary'''
-    def add_hebrand(self, atom):
+        sign = 1
 
         # eliminate '-' if there is one
         if atom[0] == '-':
+            sign = -1
             atom = atom[1:]
 
         # search hebrand base for atom
         hebrand_base = self.hebrand
-        item = next((item for item in hebrand_base if item == atom), None)
-        if item is None:    # if not yet in hebrand base then add atom
+        if atom in hebrand_base:
+
+            # search in variables list because it is already there
+            variables = self.variables
+            for i in range(0, len(variables)):
+                if variables[i] == (atom, 0):
+                    indices = [sign * k for k in range(i, i + h)]
+                    return indices
+
+        else:  # not yet in hebrand base then add atom
             hebrand_base.append(atom)
+            self.add_variable(atom, h)
+
+            i = len(self.variables)
+            indices = [sign * k for k in range(i - h, i)]
+            return indices
 
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -99,6 +107,15 @@ class SATInstance:
 
 # ----------------------------------------------------------------------------------------------------------------------
 
+    '''Function responsible for adding a problem's variable into variable_list, including time steps'''
+
+    def add_variable(self, atom, h):
+
+        for t in range(0, h):
+            self.variables.append((atom, t))
+
+            # ----------------------------------------------------------------------------------------------------------------------
+
     '''Routine that adds the action's effects and preconditions to a dictionary'''
     def add_action(self, atoms):
 
@@ -111,7 +128,8 @@ class SATInstance:
 # ----------------------------------------------------------------------------------------------------------------------
 
     '''Routine responsible for grounding all the actions(replace variables by all constants)'''
-    def ground_actions(self):
+
+    def ground_actions(self, h):
 
         action_table = list(self.action_table.items())
         constants = self.constants
@@ -123,11 +141,15 @@ class SATInstance:
             action = list(action_table[ind])
 
             # get action's variable
-            terms = action[0].split()
-            variable = next((var for var in terms if var.islower()), None)
-            if variable is None:
+            name = self.encode_atom(action[0])
+            terms = name.split()
+            for var in terms:
+                if var.islower():
+                    variable = var
+                    break
+            else:
                 if ind == (len(action_table)-1):    # leave the loop because all actions were grounded
-                    self.add_action_hebrand(action_table)  # add action's atoms to Hebrand base
+                    action_table = self.add_action_hebrand(action_table, h)  # add action's atoms to Hebrand base
                     break
                 else:
                     ind += 1    # ground the next original action
@@ -140,17 +162,17 @@ class SATInstance:
                 temp_action = copy.deepcopy(action)
 
                 # replace in name
-                temp_action[0] = ' '.join(constant if word == variable else word for word in temp_action[0].split())
+                temp_action[0] = ''.join(constant if word == variable else word for word in name.split())
 
                 # replace in preconditions
                 for i in range(len(temp_action[1][0])):
-                    temp_action[1][0][i] = ' '.join(constant if word == variable else word for word in
-                                                    temp_action[1][0][i].split())
+                    precond = self.encode_atom(temp_action[1][0][i])
+                    temp_action[1][0][i] = ''.join(constant if word == variable else word for word in precond.split())
 
                 # replace in effects
                 for i in range(len(temp_action[1][1])):
-                    temp_action[1][1][i] = ' '.join(constant if word == variable else word for word in
-                                                    temp_action[1][1][i].split())
+                    effect = self.encode_atom(temp_action[1][1][i])
+                    temp_action[1][1][i] = ''.join(constant if word == variable else word for word in effect.split())
 
                 # add new action in table
                 action_table.append(temp_action)
@@ -166,55 +188,57 @@ class SATInstance:
 
     '''Routine responsible for adding the action's atoms to the Hebrand base'''
 
-    def add_action_hebrand(self, action_table):
+    def add_action_hebrand(self, action_table, h):
 
-        for action in action_table:
+        new_action_table = []
+        for i in range(0, len(action_table)):
 
-            for atom in action[1][0]:
-                self.add_hebrand(atom)      # add action's preconditions
+            self.add_variable(action_table[i][0], h)  # add ground action to problem's variables
+            temp_actions = [(len(self.variables) - (h - k), ([], [])) for k in range(0, h)]
 
-            for atom in action[1][1]:
-                self.add_hebrand(atom)      # add action's effects
+            # define action's preconditions and effects
+            precond = action_table[i][1][0]
+            effect = action_table[i][1][1]
+
+            for j in range(0, len(precond)):
+                indices = self.add_hebrand(precond[j], h + 1)  # add action's preconditions
+                for t in range(0, h):
+                    temp_actions[t][1][0].append(indices[t])
+
+            for j in range(0, len(effect)):
+                indices = self.add_hebrand(effect[j], h + 1)  # add action's effects
+                for t in range(0, h):
+                    temp_actions[t][1][1].append(indices[t + 1])
+
+            # add actions to new action table
+            new_action_table.extend(temp_actions)
+
+        return new_action_table
 
 # ----------------------------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
     '''Function responsible to perform the linear encoding of the SAT problem'''
-    def linear_encoding(self, h, print_terminal):   # h represents the time horizon
+
+    def linear_encoding(self, h):  # h represents the time horizon
 
         sentence = []
 
         # part 1 of linear encoding, in accordance with the handout
-        sentence = self.introduce_h(self.initial_state, '0', sentence)
+        sentence.extend(self.initial_state)
         sentence = self.add_remaining_hebrand(sentence)
 
         # part 2 of linear encoding, in accordance with the handout
-        sentence = self.introduce_h(self.goal_state, str(h), sentence)
+        sentence.extend(self.goal_state)
 
         # part 3 of linear encoding, in accordance with the handout
-        sentence = self.del_implications(sentence, h)
+        sentence = self.del_implications(sentence)
 
         # part 4 of linear encoding, in accordance with the handout
-        sentence = self.frame_axioms(sentence, h)
+        sentence = self.frame_axioms(sentence)
 
         # part 5 of linear encoding, in accordance with the handout
         sentence = self.one_action(sentence, h)
-
-        if print_terminal:
-            [print(i, ': ', sentence[i]) for i in range(0, len(sentence))]
-
-        return sentence
-
-# ----------------------------------------------------------------------------------------------------------------------
-
-    '''Routine that introduces the time horizon in a sentence and includes atom in list of variables'''
-    @staticmethod
-    def introduce_h(orig_sentence, h, sentence):
-
-        for ind in range(len(orig_sentence)):
-
-            atom = "_".join((orig_sentence[ind], h))    # put time step
-            sentence.append([atom])
 
         return sentence
 
@@ -223,43 +247,44 @@ class SATInstance:
     '''Routine introducing the remaining atom in the linear encoding formulation'''
     def add_remaining_hebrand(self, sentence):
 
-        hebrand = []
-        self.introduce_h(self.hebrand, '0', hebrand)
+        hebrand = copy.deepcopy(self.hebrand)
+        variables = self.variables
+        for [i] in sentence:
+            atom = variables[i][0]
+
+            # delete initial state atom from temporary hebrand base
+            hebrand.remove(atom)
 
         for atom in hebrand:
-
-            if atom in sentence or atom[0][0] == '-':
-                continue            # already in sentence or negated atom
-            else:
-                sentence.append(['-' + atom[0]])     # needs to be negated
+            for i in range(0, len(variables)):
+                if (atom, 0) == variables[i]:
+                    sentence.append([-i])  # needs to be negated
+                    continue
 
         return sentence
 
 # ----------------------------------------------------------------------------------------------------------------------
 
     '''Function that removes the implications from the actions and translates them into CNF form'''
-    def del_implications(self, sentence, h):
+
+    def del_implications(self, sentence):
 
         action_table = self.action_table
-        for action_name in action_table:
-            for t in range(0, h):
+        for action_var in action_table:
 
                 # The implications can be converted into CNF, resulting in a conjunction of clauses,
                 # each one with the negation of the action and one of the atoms in the effects and preconditions,
                 # for all time steps
-                action = action_table[action_name]      # get action from dictionary
-                action_neg = "_".join(('-' + action_name, str(t)))     # add t and negation to action's name
+                action = action_table[action_var]  # get action from dictionary
 
                 for precond in action[0]:   # adding clauses with preconditions
-                    precond = "_".join((precond, str(t)))
-                    clause = sorted([action_neg, precond])
+                    clause = [-action_var, precond]
 
                     if clause not in sentence:  # add clause if necessary
                         sentence.append(clause)
 
                 for effect in action[1]:  # adding clauses with effects
-                    effect = "_".join((effect, str(t+1)))
-                    clause = sorted([action_neg, effect])
+                    clause = [-action_var, effect]
 
                     if clause not in sentence:  # add clause if necessary
                         sentence.append(clause)
@@ -269,44 +294,38 @@ class SATInstance:
 # ----------------------------------------------------------------------------------------------------------------------
 
     '''Function that adds the frame axioms to the SAT sentence'''
-    def frame_axioms(self, sentence, h):
+
+    def frame_axioms(self, sentence):
 
         # the frame axioms in CNF form are one clause with the negation of the action and precondition
         # and also the term with the effect not negated
         action_table = self.action_table
-        hebrand = self.hebrand
-        for action_name in action_table:
+        variables = self.variables
+        for action_var in action_table:
+
+            hebrand = copy.deepcopy(self.hebrand)
 
             # get action's effects from table
-            action = action_table[action_name]
+            action = action_table[action_var]
             effects = action[1]
 
-            # remove '-' to compare with hebrand atoms
-            for i in range(0, len(effects)):
-                if effects[i][0] == '-':
-                    effects[i] = effects[i][1:]
+            t = 0
+            # remove '-' sign from effects and delete atom from temporary hebrand base
+            for effect in effects:
+                if hebrand.count(variables[abs(effect)][0]):
+                    hebrand.remove(variables[abs(effect)][0])
+                    t = variables[abs(effect)][1]
 
-            # for hebrand base atoms not in action add clause
+            # for hebrand base atoms not in action effects, add clause
             for atom in hebrand:
-                if atom not in effects:
-                    for t in range(0, h):
+                # get index in variables list
+                ind = variables.index((atom, t))
 
-                        # atom at time step t
-                        atom_t_neg = "_".join(('-' + atom, str(t)))
-                        atom_t = "_".join((atom, str(t)))
-
-                        # atom at time step t+1
-                        atom_t1_neg = "_".join(('-' + atom, str(t+1)))
-                        atom_t1 = "_".join((atom, str(t+1)))
-
-                        # action at time step t
-                        action_t = "_".join(('-' + action_name, str(t)))
-
-                        # create new clauses and add to SAT sentence
-                        clause1 = sorted([atom_t_neg, atom_t1, action_t])
-                        clause2 = sorted([atom_t, atom_t1_neg, action_t])
-                        sentence.append(clause1)
-                        sentence.append(clause2)
+                # create new clauses and add to SAT sentence
+                clause1 = [-action_var, -(ind - 1), ind]
+                clause2 = [-action_var, (ind - 1), -ind]
+                sentence.append(clause1)
+                sentence.append(clause2)
 
         return sentence
 
@@ -315,24 +334,24 @@ class SATInstance:
     '''Function that adds the conjunctions from one action at time to SAT sentence'''
     def one_action(self, sentence, h):
 
-        action_table = list(self.action_table)
+        action_table = self.action_table
+        variables = self.variables
         for t in range(0, h):
-            clause_or = []  # clause will be filled with disjunction of all actions
-            for i in range(0, len(action_table)):
 
-                # build at least one constraint
-                action_1 = "_".join((action_table[i], str(t)))
-                clause_or.append(action_1)
+            temp_actions = []
+            for action in action_table:
+                if variables[action][1] == t:
+                    temp_actions.append(action)
 
-                # build and add at max one constraint
-                for j in range(i + 1, len(action_table)):
-                    action_2 = "_".join(('-' + action_table[j], str(t)))
+            # build and add at max one constraint
+            for i in range(0, len(temp_actions)):
+                for j in range(i + 1, len(temp_actions)):
 
                     # create new clause and add to SAT sentence
-                    clause = sorted(['-' + action_1, action_2])
+                    clause = [-temp_actions[i], -temp_actions[j]]
                     sentence.append(clause)
 
-            sentence.append(clause_or)  # add at least one constraint
+            sentence.append(temp_actions)  # add at least one constraint
 
         return sentence
 
@@ -340,7 +359,8 @@ class SATInstance:
 # ----------------------------------------------------------------------------------------------------------------------
 
     """Function responsible for writing SAT sentence formulation into file, using DIMACS syntax"""
-    def write_dimacs(self, sentence, h, filename, start_time):
+
+    def write_dimacs(self, sentence, filename, start_time):
 
         f = open('dimacs.dat', 'w')
 
@@ -350,15 +370,8 @@ class SATInstance:
         f.write(('c Reading file and encoding problem took: %.6f [s] \n' % (time.clock() - start_time)))
         f.write('c \n')
 
-        # create variable list (ground atoms in hebrand base plus all ground actions plus ground atoms of goal)
-        variable_list = []
-        temp_list = self.hebrand + list(self.action_table)
-        for t in range(0, h):
-            self.introduce_h(temp_list, str(t), variable_list)
-
-        self.introduce_h(self.goal_state, str(h), variable_list)
-
-        variables = len(variable_list)  # number of variables (size of variable_list)
+        # create variable list (ground atoms in hebrand base plus all ground actions)
+        variables = len(self.variables)  # number of variables (size of variable_list)
         clauses = len(sentence)     # number of clauses (size of sentence)
 
         # write problem line
@@ -374,21 +387,7 @@ class SATInstance:
 
             string = ''
             for atom in clause:
-
-                # sign to add in clause
-                sign = ''
-
-                # remove '-' from atom to compare with variable list
-                if atom[0] == '-':
-                    sign = '-'
-                    atom = atom[1:]
-
-                for i in range(0, len(variable_list)):
-                    if atom == variable_list[i][0]:
-
-                        # add atom to clause
-                        string = ' '.join((string, sign + str(i+1)))
-                        break
+                string = ' '.join((string, str(atom)))
 
             # add clause to output
             output = ''.join((output, string[1:] + ' 0\n'))
