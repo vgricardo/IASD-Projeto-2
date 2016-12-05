@@ -1,10 +1,10 @@
-import time
+a = dict({(3, True), (4, 32), (5, False), (6, True), (7, False), (8, True)})
 
-a = -3
-start = time.clock()
-print(-a)
-print('Elapsed time: %.8f' % (time.clock() - start))
+print(a[3])
 
-start = time.clock()
-print(-abs(a))
-print('Elapsed time: %.8f' % (time.clock() - start))
+print(a.get(4))
+
+a[9] = 'sdwef'
+
+if 9 in a:
+    print('check')
