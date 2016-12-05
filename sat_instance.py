@@ -15,12 +15,11 @@ class SATInstance:
         self.goal_state = []  # saves the goal states atoms
         self.hebrand = []  # saves the hebrand base
         self.variables = [None]  # keeps the information of problem's variables
-
+        # TODO: check performance with variables as dict
 # ----------------------------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
     '''Routine to read the information from .dat file'''
-
     def read_file(self, filename, h):
 
         with open(filename, 'r') as fh:
@@ -49,7 +48,6 @@ class SATInstance:
 # ----------------------------------------------------------------------------------------------------------------------
 
     '''Routine that adds the constants in the problem's domain'''
-
     def add_constants(self, atom):
 
         atom = self.encode_atom(atom)
@@ -64,7 +62,6 @@ class SATInstance:
             # ----------------------------------------------------------------------------------------------------------------------
 
     '''Function that adds atom to hebrand base and variable list if necessary'''
-
     def add_hebrand(self, atom, h):
 
         sign = 1
@@ -108,7 +105,6 @@ class SATInstance:
 # ----------------------------------------------------------------------------------------------------------------------
 
     '''Function responsible for adding a problem's variable into variable_list, including time steps'''
-
     def add_variable(self, atom, h):
 
         for t in range(0, h):
@@ -128,7 +124,6 @@ class SATInstance:
 # ----------------------------------------------------------------------------------------------------------------------
 
     '''Routine responsible for grounding all the actions(replace variables by all constants)'''
-
     def ground_actions(self, h):
 
         action_table = list(self.action_table.items())
@@ -187,7 +182,6 @@ class SATInstance:
 # ----------------------------------------------------------------------------------------------------------------------
 
     '''Routine responsible for adding the action's atoms to the Hebrand base'''
-
     def add_action_hebrand(self, action_table, h):
 
         new_action_table = []
@@ -219,7 +213,6 @@ class SATInstance:
 # ----------------------------------------------------------------------------------------------------------------------
 
     '''Function responsible to perform the linear encoding of the SAT problem'''
-
     def linear_encoding(self, h):  # h represents the time horizon
 
         sentence = []
@@ -266,7 +259,6 @@ class SATInstance:
 # ----------------------------------------------------------------------------------------------------------------------
 
     '''Function that removes the implications from the actions and translates them into CNF form'''
-
     def del_implications(self, sentence):
 
         action_table = self.action_table
@@ -294,7 +286,6 @@ class SATInstance:
 # ----------------------------------------------------------------------------------------------------------------------
 
     '''Function that adds the frame axioms to the SAT sentence'''
-
     def frame_axioms(self, sentence):
 
         # the frame axioms in CNF form are one clause with the negation of the action and precondition
@@ -331,6 +322,44 @@ class SATInstance:
 
 # ----------------------------------------------------------------------------------------------------------------------
 
+    '''Function that adds the frame axioms to the SAT sentence, explanatory'''
+
+    def frame_axioms_explan(self, sentence):
+
+        # the frame axioms in CNF form are one clause with the negation of the action and precondition
+        # and also the term with the effect not negated
+        action_table = self.action_table
+        variables = self.variables
+        for action_var in action_table:
+
+            hebrand = copy.deepcopy(self.hebrand)
+
+            # get action's effects from table
+            action = action_table[action_var]
+            effects = action[1]
+
+            t = 0
+            # remove '-' sign from effects and delete atom from temporary hebrand base
+            for effect in effects:
+                if hebrand.count(variables[abs(effect)][0]):
+                    hebrand.remove(variables[abs(effect)][0])
+                    t = variables[abs(effect)][1]
+
+            # for hebrand base atoms not in action effects, add clause
+            for atom in hebrand:
+                # get index in variables list
+                ind = variables.index((atom, t))
+
+                # create new clauses and add to SAT sentence
+                clause1 = [-action_var, -(ind - 1), ind]
+                clause2 = [-action_var, (ind - 1), -ind]
+                sentence.append(clause1)
+                sentence.append(clause2)
+
+        return sentence
+
+    # ----------------------------------------------------------------------------------------------------------------------
+
     '''Function that adds the conjunctions from one action at time to SAT sentence'''
     def one_action(self, sentence, h):
 
@@ -359,7 +388,6 @@ class SATInstance:
 # ----------------------------------------------------------------------------------------------------------------------
 
     """Function responsible for writing SAT sentence formulation into file, using DIMACS syntax"""
-
     def write_dimacs(self, sentence, filename, start_time):
 
         f = open('dimacs.dat', 'w')
@@ -395,3 +423,6 @@ class SATInstance:
         # write output and close file
         f.write(output)
         f.close()
+
+# ----------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
