@@ -101,7 +101,7 @@ class SATInstance:
     def encode_atom(atom):
 
         atom = atom.replace('(', ' ')
-        atom = atom.replace(')', ' ')
+        atom = atom.replace(')', '')
         atom = atom.replace(',', ' ')
 
         return atom
