@@ -30,13 +30,13 @@ class SATInstance:
 
                     if atoms[0] == 'I':  # line with initial state
                         for i in range(1, len(atoms)):
-                            self.add_constants(atoms[i])  # get constants from atom
+                            atoms[i] = self.add_constants(atoms[i])  # get constants from atom
                             indices = self.add_hebrand(atoms[i], h + 1)  # add atom to hebrand base
                             self.initial_state.append([indices[0]])  # save variable id, accounting for atom sign
 
                     elif atoms[0] == 'G':  # line with goal state
                         for i in range(1, len(atoms)):
-                            self.add_constants(atoms[i])  # get constants from atom
+                            atoms[i] = self.add_constants(atoms[i])  # get constants from atom
                             indices = self.add_hebrand(atoms[i], h + 1)  # add atom to hebrand base
 
                             self.goal_state.append([indices[-1]])  # save variable id, accounting for atom sign
@@ -59,7 +59,9 @@ class SATInstance:
             if term not in constants and not term.islower() and term.isalnum():
                 constants.append(term)
 
-            # ----------------------------------------------------------------------------------------------------------------------
+        return atom
+
+    # ----------------------------------------------------------------------------------------------------------------------
 
     '''Function that adds atom to hebrand base and variable list if necessary'''
     def add_hebrand(self, atom, h):
@@ -96,9 +98,9 @@ class SATInstance:
     @staticmethod
     def encode_atom(atom):
 
-        atom = atom.replace('(', '( ')
-        atom = atom.replace(')', ' )')
-        atom = atom.replace(',', ' , ')
+        atom = atom.replace('(', ' ')
+        atom = atom.replace(')', ' ')
+        atom = atom.replace(',', ' ')
 
         return atom
 
@@ -118,7 +120,7 @@ class SATInstance:
         split_ind = atoms.index('->')  # search -> sign to separate effects from preconditions
 
         # fill the dictionary with the action's information
-        self.action_table[atoms[0]] = (atoms[1:split_ind], atoms[split_ind + 1:])
+        self.action_table[atoms[0]] = [atoms[1:split_ind], atoms[split_ind + 1:]]
 
 # ----------------------------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
@@ -126,25 +128,39 @@ class SATInstance:
     '''Routine responsible for grounding all the actions(replace variables by all constants)'''
     def ground_actions(self, h):
 
-        action_table = list(self.action_table.items())
+        actions = list(self.action_table)
+        action_table = self.action_table
+
+        # remove parenthesis and comas from actions
+        for i in range(0, len(actions)):
+            name = actions[i]
+
+            # remove from action's name
+            actions[i] = self.encode_atom(actions[i])
+
+            action = action_table.pop(name)  # get action description
+            for j in range(0, len(action[0])):
+                action[0][j] = self.encode_atom(action[0][j])  # remove from action preconditions
+
+            for j in range(0, len(action[1])):
+                action[1][j] = self.encode_atom(action[1][j])  # remove from action effects
+
+            # include new action in action table
+            action_table[actions[i]] = action
+
         constants = self.constants
         ind = 0
-
         while True:
 
-            # copy current action from table
-            action = list(action_table[ind])
-
-            # get action's variable
-            name = self.encode_atom(action[0])
-            terms = name.split()
-            for var in terms:
-                if var.islower():
-                    variable = var
+            # get terms in action name
+            action = actions[ind]
+            terms = action.split()
+            for variable in terms:
+                if variable.islower():
                     break
             else:
-                if ind == (len(action_table)-1):    # leave the loop because all actions were grounded
-                    action_table = self.add_action_hebrand(action_table, h)  # add action's atoms to Hebrand base
+                if ind == (len(actions) - 1):  # leave the loop because all actions were grounded
+                    action_table = self.add_action_hebrand(action_table, actions, h)  # add action atoms to Hebrand base
                     break
                 else:
                     ind += 1    # ground the next original action
@@ -154,26 +170,28 @@ class SATInstance:
             for constant in constants:
 
                 # initialize temporary variables
-                temp_action = copy.deepcopy(action)
+                temp_action = [action, copy.deepcopy(action_table[action])]
 
                 # replace in name
-                temp_action[0] = ''.join(constant if word == variable else word for word in name.split())
+                temp_action[0] = ' '.join(constant if word == variable else word for word in terms)
 
                 # replace in preconditions
                 for i in range(len(temp_action[1][0])):
-                    precond = self.encode_atom(temp_action[1][0][i])
-                    temp_action[1][0][i] = ''.join(constant if word == variable else word for word in precond.split())
+                    temp_action[1][0][i] = ' '.join(constant if word == variable else word for word in
+                                                    temp_action[1][0][i].split())
 
                 # replace in effects
                 for i in range(len(temp_action[1][1])):
-                    effect = self.encode_atom(temp_action[1][1][i])
-                    temp_action[1][1][i] = ''.join(constant if word == variable else word for word in effect.split())
+                    temp_action[1][1][i] = ' '.join(constant if word == variable else word for word in
+                                                    temp_action[1][1][i].split())
 
-                # add new action in table
-                action_table.append(temp_action)
+                # add new action
+                action_table[temp_action[0]] = temp_action[1]  # add new action in action table
+                actions.append(temp_action[0])
 
-            # delete original action used in the last iteration from the list
-            del action_table[ind]
+            # delete original action used in the last iteration
+            del actions[ind]
+            del action_table[action]
 
         # update actions dictionary
         self.action_table.clear()
@@ -182,17 +200,18 @@ class SATInstance:
 # ----------------------------------------------------------------------------------------------------------------------
 
     '''Routine responsible for adding the action's atoms to the Hebrand base'''
-    def add_action_hebrand(self, action_table, h):
+
+    def add_action_hebrand(self, action_table, actions, h):
 
         new_action_table = []
-        for i in range(0, len(action_table)):
+        for i in range(0, len(actions)):
 
-            self.add_variable(action_table[i][0], h)  # add ground action to problem's variables
+            self.add_variable(actions[i], h)  # add ground action to problem's variables
             temp_actions = [(len(self.variables) - (h - k), ([], [])) for k in range(0, h)]
 
             # define action's preconditions and effects
-            precond = action_table[i][1][0]
-            effect = action_table[i][1][1]
+            precond = action_table[actions[i]][0]
+            effect = action_table[actions[i]][1]
 
             for j in range(0, len(precond)):
                 indices = self.add_hebrand(precond[j], h + 1)  # add action's preconditions
@@ -240,7 +259,7 @@ class SATInstance:
     '''Routine introducing the remaining atom in the linear encoding formulation'''
     def add_remaining_hebrand(self, sentence):
 
-        hebrand = copy.deepcopy(self.hebrand)
+        hebrand = self.hebrand[:]
         variables = self.variables
         for [i] in sentence:
             atom = variables[i][0]
@@ -294,7 +313,7 @@ class SATInstance:
         variables = self.variables
         for action_var in action_table:
 
-            hebrand = copy.deepcopy(self.hebrand)
+            hebrand = self.hebrand[:]
 
             # get action's effects from table
             action = action_table[action_var]
@@ -332,7 +351,7 @@ class SATInstance:
         variables = self.variables
         for action_var in action_table:
 
-            hebrand = copy.deepcopy(self.hebrand)
+            hebrand = self.hebrand[:]
 
             # get action's effects from table
             action = action_table[action_var]
@@ -423,6 +442,30 @@ class SATInstance:
         # write output and close file
         f.write(output)
         f.close()
+
+# ----------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+    """Function used to write solution on the terminal"""
+
+    def write_solution(self, model):
+
+        solution = []
+        variables = self.variables
+        for i in range(1, len(variables)):
+            if model.get(i) is True:  # true value found
+
+                name = variables[i][0]
+                # discover if is atom or action
+                if name not in self.hebrand:
+                    solution.append(variables[i])  # get actions of solution
+
+        # order actions
+        solution = sorted(solution, key=lambda x: x[1])
+
+        # print in terminal
+        for action in solution:
+            print(action[0])
 
 # ----------------------------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------

@@ -1,20 +1,18 @@
 """File with the sat solver functions"""
 
-import copy
-
 # ----------------------------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 ''' Main DPLL sat solver function'''
 
 
-def dpll_satisfiable(clauses, symbols):
-    return dpll(clauses, copy.deepcopy(symbols), dict())
+def dpll_recursive(clauses, symbols):
+    return dpll(clauses, symbols, dict())
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-''' DPLL algorithm routine'''
+''' DPLL algorithm routine, recursive method'''
 
 
 def dpll(clauses, symbols, model):
@@ -40,21 +38,21 @@ def dpll(clauses, symbols, model):
     p, value = find_pure_symbol(symbols, unknown_clauses)
     if p:  # pure symbol is found
         symbols.remove(p)  # remove p from symbols
-        return dpll(clauses, copy.deepcopy(symbols), copy.deepcopy(extend_model(model, p, value)))
+        return dpll(clauses, symbols[:], extend_model(model, p, value).copy())
 
     # Check for unit clauses
     p, value = find_unit_clause(clauses, model)
-    if p:  # pure symbol is found
+    if p:  # unit clause is found
         symbols.remove(p)  # remove p from symbols
-        return dpll(clauses, copy.deepcopy(symbols), copy.deepcopy(extend_model(model, p, value)))
+        return dpll(clauses, symbols[:], extend_model(model, p, value).copy())
 
     # No pure symbols or unit clauses, get first variable in symbols and assign a value
     p = symbols[0]
     symbols = symbols[1:]
 
     # run DPLL with a value assigned to p
-    return (dpll(clauses, copy.deepcopy(symbols), copy.deepcopy(extend_model(model, p, True))) or
-            dpll(clauses, copy.deepcopy(symbols), copy.deepcopy(extend_model(model, p, False))))
+    return (dpll(clauses, symbols[:], extend_model(model, p, True).copy()) or
+            dpll(clauses, symbols[:], extend_model(model, p, False).copy()))
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -171,3 +169,131 @@ def extend_model(model, symbol, value):
 
 # ----------------------------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
+
+"""DPLL algorithm, iterative implementation"""
+
+
+def dpll_iterative(clauses, symbols):
+    # Initializations
+    model = dict()
+    assigned_symbols = dict()
+    modified_clauses = dict()
+    assign_order = []
+
+    while True:
+        p, value = decide_next_branch(symbols, clauses, model)
+
+        while True:
+            status = deduce(p, value, symbols, model, clauses, assigned_symbols, modified_clauses, assign_order)
+
+            if status is True:  # SAT is satisfied with current model
+                return model
+            elif status is None:  # need to assign other variable
+                break
+            else:  # some conflict occurred
+                # analyze conflict
+                blevel = analyze_conflict(assigned_symbols, modified_clauses, assign_order, status)
+                if blevel == 0:  # not possible to backtrack, problem is unfeasible
+                    return False
+
+                    # # backtrack for last conflict variable
+                    # backtrack(blevel, assigned_symbols, modified_clauses, assign_order)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+
+"""Choose next assigned symbol, assigning True to a symbol"""
+
+
+def decide_next_branch(symbols, clauses, model):
+    p, value = find_pure_symbol(symbols, clauses)
+    if p:  # pure symbol is found
+        return p, value
+
+    # Check for unit clauses
+    p, value = find_unit_clause(clauses, model)
+    if p:  # unit clause is found
+        return p, value
+
+    # No pure symbols or unit clauses, get first variable in symbols and assign True
+    p = symbols[0]
+    return p, True
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+
+"""Function that applies unit propagation, keeping track of conflicts"""
+
+
+def deduce(p, value, symbols, model, clauses, assigned_symbols, modified_clauses, assign_order):
+    # updating information for assignment of p
+    update_information(p, value, symbols, model, assigned_symbols, assign_order)
+
+    i = 0  # iterator in clauses
+    # unit propagation of assignment
+    while True:
+
+        if i == len(clauses):  # all clauses analyzed
+            return None
+
+        clause = clauses[i]
+        clause_changed = False
+        temp_clause = clause[:]
+        for literal in clause:
+
+            if abs(literal) == p:  # symbol p is found in clause
+                if (literal > 0 and value) or (literal < 0 and not value):  # symbol is true, making clause true
+                    clauses.remove(clause)
+                    clause_changed = True
+                    break
+
+                else:  # literal is false in clause, can be eliminated from it
+                    clause.remove(literal)
+                    clause_changed = True
+                    if len(clause) == 0:  # check if clause is unsatisfiable
+                        return temp_clause
+                    break
+        else:
+            i += 1  # move to next clause
+
+        if len(clauses) == 0:  # problem is satisfiable
+            return True
+
+        if clause_changed:  # add clause to modified clauses
+            if modified_clauses.get(p):
+                modified_clauses[p].append(temp_clause)
+            else:
+                modified_clauses.setdefault(p, [temp_clause])
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+
+"""Function that updates information for p assignment"""
+
+
+def update_information(p, value, symbols, model, assigned_symbols, assign_order):
+    symbols.remove(p)  # remove symbols from symbols to assign
+    if value:
+        assign_order.append(p)  # include last assigned
+    else:
+        assign_order.append(-p)
+
+    model[p] = value  # include truth value in model
+
+    # update values already assigned to symbols
+    if assigned_symbols.get(p):
+        assigned_symbols[p].append(value)
+    else:
+        assigned_symbols.setdefault(p, [value])
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+
+"""Routine responsible for analyzing the conflict that appeared"""
+
+
+def analyze_conflict(assigned_symbols, modified_clauses, assign_order, conflict_clause):
+    conflict_var = assign_order[-1]
+    conflict_clause.remove(conflict_var)
+
+    return 1

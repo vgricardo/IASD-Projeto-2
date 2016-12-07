@@ -1,6 +1,5 @@
 import sys
 
-from DPLL import *
 from sat_instance import *
 
 
@@ -20,6 +19,7 @@ def main(arg1):
     sat.read_file(filename, h_max)
 
     # SAT_Plan algorithm
+    model = False
     for h in range(h_max, h_max + 1):
 
         # Ground all the actions
@@ -40,13 +40,17 @@ def main(arg1):
 
         # get symbols used in sat sentence
         symbols = [i for i in range(1, len(sat.variables))]
+        print('Encoding Time: %.6f' % (time.clock() - start_time))
 
-        # Run SAT solver
-        model = dpll_satisfiable(cnf, symbols)
-        # if model is not False:
-        #     return extract_solution(model)
-
-    print('Elapsed time: %.6f [s]' % (time.clock() - start_time))
+        #     # Run SAT solver
+        #     model = dpll_recursive(cnf, symbols)
+        #     # model = dpll_iterative(cnf, symbols)
+        #     # if model is not False:
+        #     #     return extract_solution(model)
+        #
+        # # write solution to terminal
+        # sat.write_solution(model)
+        # print('Elapsed time: %.6f [s]' % (time.clock() - start_time))
 
 # To read the command line arguments
 if __name__ == '__main__':
