@@ -1,5 +1,5 @@
 """File with the sat solver functions"""
-
+# TODO: DPLL finish iterative and include improvements
 # ----------------------------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -198,7 +198,7 @@ def dpll_iterative(clauses, symbols):
 
                     # # backtrack for last conflict variable
                     # backtrack(blevel, assigned_symbols, modified_clauses, assign_order)
-
+                    # TODO: finish analyze conflict and do backtrack according to algorithm 2.2 handbook
 
 # ----------------------------------------------------------------------------------------------------------------------
 
