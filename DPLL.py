@@ -1,3 +1,5 @@
+import time
+
 """File with the sat solver functions"""
 # TODO: DPLL finish iterative and include improvements
 # ----------------------------------------------------------------------------------------------------------------------
@@ -181,10 +183,10 @@ def dpll_iterative(clauses, symbols):
     assign_order = []
 
     while True:
-        p, value = decide_next_branch(symbols, clauses, model)
+        p, value, pure = decide_next_branch(symbols, clauses, model)
 
         while True:
-            status = deduce(p, value, symbols, model, clauses, assigned_symbols, modified_clauses, assign_order)
+            status = deduce(p, value, pure, symbols, model, clauses, assigned_symbols, modified_clauses, assign_order)
 
             if status is True:  # SAT is satisfied with current model
                 return model
@@ -195,10 +197,18 @@ def dpll_iterative(clauses, symbols):
                 blevel = analyze_conflict(assigned_symbols, modified_clauses, assign_order, status)
                 if blevel == 0:  # not possible to backtrack, problem is unfeasible
                     return False
+                backtrack(blevel, assigned_symbols, modified_clauses, assign_order)
 
                     # # backtrack for last conflict variable
                     # backtrack(blevel, assigned_symbols, modified_clauses, assign_order)
                     # TODO: finish analyze conflict and do backtrack according to algorithm 2.2 handbook
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+
+"""CBacktrack"""
+def backtrack(blevel, assigned_symbols, modified_clauses, assign_order):
+    return 0
 
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -206,18 +216,30 @@ def dpll_iterative(clauses, symbols):
 
 
 def decide_next_branch(symbols, clauses, model):
+
+    # Check for pure symbols
+    #timer = time.clock()
     p, value = find_pure_symbol(symbols, clauses)
+    #print('Time: %.6f' % (time.clock() - timer))
     if p:  # pure symbol is found
-        return p, value
+        return p, value, True
 
     # Check for unit clauses
+    #timer = time.clock()
     p, value = find_unit_clause(clauses, model)
+    #print('Time: %.6f' % (time.clock() - timer))
     if p:  # unit clause is found
-        return p, value
+        return p, value, False
+
+    # Check the most frequent symbol among clauses
+    #timer = time.clock()
+    #p = find_most_used_symbol(symbols, clauses)
+    #print('Time: %.6f' % (time.clock() - timer))
+    # return p, True
 
     # No pure symbols or unit clauses, get first variable in symbols and assign True
     p = symbols[0]
-    return p, True
+    return p, True, False
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -225,9 +247,9 @@ def decide_next_branch(symbols, clauses, model):
 """Function that applies unit propagation, keeping track of conflicts"""
 
 
-def deduce(p, value, symbols, model, clauses, assigned_symbols, modified_clauses, assign_order):
+def deduce(p, value, pure, symbols, model, clauses, assigned_symbols, modified_clauses, assign_order):
     # updating information for assignment of p
-    update_information(p, value, symbols, model, assigned_symbols, assign_order)
+    update_information(p, value, pure, symbols, model, assigned_symbols, assign_order)
 
     i = 0  # iterator in clauses
     # unit propagation of assignment
@@ -271,7 +293,7 @@ def deduce(p, value, symbols, model, clauses, assigned_symbols, modified_clauses
 """Function that updates information for p assignment"""
 
 
-def update_information(p, value, symbols, model, assigned_symbols, assign_order):
+def update_information(p, value, pure, symbols, model, assigned_symbols, assign_order):
     symbols.remove(p)  # remove symbols from symbols to assign
     if value:
         assign_order.append(p)  # include last assigned
@@ -283,6 +305,8 @@ def update_information(p, value, symbols, model, assigned_symbols, assign_order)
     # update values already assigned to symbols
     if assigned_symbols.get(p):
         assigned_symbols[p].append(value)
+        if pure:
+            assigned_symbols[p].append('pure')
     else:
         assigned_symbols.setdefault(p, [value])
 
@@ -297,3 +321,20 @@ def analyze_conflict(assigned_symbols, modified_clauses, assign_order, conflict_
     conflict_clause.remove(conflict_var)
 
     return 1
+
+# ----------------------------------------------------------------------------------------------------------------------
+
+"""Function that choose the symbol that occurs most frequently"""
+
+def find_most_used_symbol(symbols, clauses):
+    n = 0
+    m = 0
+    for symbol in symbols:
+        for clause in clauses:
+            if symbol in clause or -symbol in clause:
+                n=n+1
+        if n > m:
+            m = n
+            n = 0
+            p = symbol
+    return p
