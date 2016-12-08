@@ -187,59 +187,72 @@ def dpll_iterative(clauses, symbols):
 
         while True:
             status = deduce(p, value, pure, symbols, model, clauses, assigned_symbols, modified_clauses, assign_order)
-
             if status is True:  # SAT is satisfied with current model
                 return model
             elif status is None:  # need to assign other variable
                 break
             else:  # some conflict occurred
                 # analyze conflict
-                blevel = analyze_conflict(assigned_symbols, modified_clauses, assign_order, status)
+                blevel = analyze_conflict(p, assign_order, assigned_symbols)
                 if blevel == 0:  # not possible to backtrack, problem is unfeasible
                     return False
-                backtrack(blevel, assigned_symbols, modified_clauses, assign_order)
-
-                    # # backtrack for last conflict variable
-                    # backtrack(blevel, assigned_symbols, modified_clauses, assign_order)
-                    # TODO: finish analyze conflict and do backtrack according to algorithm 2.2 handbook
+                else:
+                    backtrack(p, value, symbols, model, clauses, assigned_symbols, modified_clauses, assign_order, status, blevel, status)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 
 """CBacktrack"""
-def backtrack(blevel, assigned_symbols, modified_clauses, assign_order):
-    return 0
+
+
+def backtrack(p, value, symbols, model, clauses, assigned_symbols, modified_clauses, assign_order, blevel, status):
+
+    clauses.append(status)
+
+    if blevel == len(assign_order):
+        if value == True:
+            value = False
+        else:
+            value = True
+        for clause in modified_clauses[p]:
+            clauses.append(clause)
+        del modified_clauses[p]
+    else:
+        while blevel != len(assign_order):
+            symbols.append(p)
+            del model[p]
+            del assigned_symbols[p]
+            for clause in modified_clauses[p]:
+                clauses.append(clause)
+            del modified_clauses[p]
+            assign_order.remove(p)
+            p = assign_order[-1]
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-"""Choose next assigned symbol, assigning True to a symbol"""
+"""Routine responsible for analyzing the conflict that appeared"""
 
 
-def decide_next_branch(symbols, clauses, model):
-
-    # Check for pure symbols
-    #timer = time.clock()
-    p, value = find_pure_symbol(symbols, clauses)
-    #print('Time: %.6f' % (time.clock() - timer))
-    if p:  # pure symbol is found
-        return p, value, True
-
-    # Check for unit clauses
-    #timer = time.clock()
-    p, value = find_unit_clause(clauses, model)
-    #print('Time: %.6f' % (time.clock() - timer))
-    if p:  # unit clause is found
-        return p, value, False
-
-    # Check the most frequent symbol among clauses
-    #timer = time.clock()
-    #p = find_most_used_symbol(symbols, clauses)
-    #print('Time: %.6f' % (time.clock() - timer))
-    # return p, True
-
-    # No pure symbols or unit clauses, get first variable in symbols and assign True
-    p = symbols[0]
-    return p, True, False
+def analyze_conflict(p, assign_order, assigned_symbols):
+    i = 0
+    while True:
+        if 'pure' in assigned_symbols[p]:
+            p = assign_order[-i-1]
+            i += 1
+        elif True in assigned_symbols[p]:
+            if False in assigned_symbols[p]:
+                p = assign_order[-i - 1]
+                i += 1
+        elif False in assigned_symbols[p]:
+            if True in assigned_symbols[p]:
+                p = assign_order[-i - 1]
+                i += 1
+        else:
+            blevel = assign_order - i + 1
+            return blevel
+        if i == len(assign_order):
+            return 0
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -294,11 +307,10 @@ def deduce(p, value, pure, symbols, model, clauses, assigned_symbols, modified_c
 
 
 def update_information(p, value, pure, symbols, model, assigned_symbols, assign_order):
-    symbols.remove(p)  # remove symbols from symbols to assign
-    if value:
+    if abs(p) in symbols:
+        symbols.remove(p)  # remove symbols from symbols to assign
+    if abs(p) not in assign_order:
         assign_order.append(p)  # include last assigned
-    else:
-        assign_order.append(-p)
 
     model[p] = value  # include truth value in model
 
@@ -313,18 +325,33 @@ def update_information(p, value, pure, symbols, model, assigned_symbols, assign_
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-"""Routine responsible for analyzing the conflict that appeared"""
+"""Choose next assigned symbol, assigning True to a symbol"""
 
 
-def analyze_conflict(assigned_symbols, modified_clauses, assign_order, conflict_clause):
-    conflict_var = assign_order[-1]
-    conflict_clause.remove(conflict_var)
+def decide_next_branch(symbols, clauses, model):
 
-    return 1
+    # Check for pure symbols
+    p, value = find_pure_symbol(symbols, clauses)
+    if p:  # pure symbol is found
+        return p, value, True
+
+    # Check for unit clauses
+    p, value = find_unit_clause(clauses, model)
+    if p:  # unit clause is found
+        return p, value, False
+
+    # Check the most frequent symbol among clauses
+    #p = find_most_used_symbol(symbols, clauses)
+    #return p, True
+
+    # No pure symbols or unit clauses, get first variable in symbols and assign True
+    p = symbols[0]
+    return p, True, False
 
 # ----------------------------------------------------------------------------------------------------------------------
 
 """Function that choose the symbol that occurs most frequently"""
+
 
 def find_most_used_symbol(symbols, clauses):
     n = 0
@@ -332,7 +359,7 @@ def find_most_used_symbol(symbols, clauses):
     for symbol in symbols:
         for clause in clauses:
             if symbol in clause or -symbol in clause:
-                n=n+1
+                n += 1
         if n > m:
             m = n
             n = 0
