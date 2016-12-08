@@ -11,11 +11,11 @@ class SATInstance:
     """Class defining a SAT problem instance"""
 
     def __init__(self):
-        self.constants = []  # list with all the constants in the problem domain
+        self.constants = set()  # list with all the constants in the problem domain
         self.action_table = dict()  # dictionary that will save the actions preconditions and effects
         self.initial_state = []  # saves the initial state atoms
         self.goal_state = []  # saves the goal states atoms
-        self.hebrand = []  # saves the hebrand base
+        self.hebrand = set()  # saves the hebrand base
         self.variables = [None]  # keeps the information of problem's variables
         # TODO: check performance with variables as dict
 # ----------------------------------------------------------------------------------------------------------------------
@@ -46,6 +46,7 @@ class SATInstance:
                     elif atoms[0] == 'A':  # line with an action description
                         atoms[1] = atoms[1][:-1]  # delete ':' sign in the action name
                         self.add_action(atoms[1:])  # adds the action's preconditions and effects to dictionary table
+                        [self.add_constants(atom) for atom in atoms[1:]]  # add action's constants
 
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -59,7 +60,7 @@ class SATInstance:
         # check if they already exist or add constant if necessary, variables are ignored
         for term in terms[1:]:
             if term not in constants and not term.islower() and term.isalnum():
-                constants.append(term)
+                constants.add(term)
 
         return atom
 
@@ -87,7 +88,7 @@ class SATInstance:
                     return indices
 
         else:  # not yet in hebrand base then add atom
-            hebrand_base.append(atom)
+            hebrand_base.add(atom)
             self.add_variable(atom, h)
 
             i = len(self.variables)
@@ -261,7 +262,7 @@ class SATInstance:
     '''Routine introducing the remaining atom in the linear encoding formulation'''
     def add_remaining_hebrand(self, sentence):
 
-        hebrand = self.hebrand[:]
+        hebrand = self.hebrand.copy()
         variables = self.variables
         for [i] in sentence:
             atom = variables[i][0]
@@ -315,7 +316,7 @@ class SATInstance:
         variables = self.variables
         for action_var in action_table:
 
-            hebrand = self.hebrand[:]
+            hebrand = self.hebrand.copy()
 
             # get action's effects from table
             action = action_table[action_var]
@@ -324,7 +325,7 @@ class SATInstance:
             t = 0
             # remove '-' sign from effects and delete atom from temporary hebrand base
             for effect in effects:
-                if hebrand.count(variables[abs(effect)][0]):
+                if (variables[abs(effect)][0]) in hebrand:
                     hebrand.remove(variables[abs(effect)][0])
                     t = variables[abs(effect)][1]
 
@@ -342,44 +343,6 @@ class SATInstance:
         return sentence
 
 # ----------------------------------------------------------------------------------------------------------------------
-
-    '''Function that adds the frame axioms to the SAT sentence, explanatory'''
-
-    def frame_axioms_explan(self, sentence):
-
-        # the frame axioms in CNF form are one clause with the negation of the action and precondition
-        # and also the term with the effect not negated
-        action_table = self.action_table
-        variables = self.variables
-        for action_var in action_table:
-
-            hebrand = self.hebrand[:]
-
-            # get action's effects from table
-            action = action_table[action_var]
-            effects = action[1]
-
-            t = 0
-            # remove '-' sign from effects and delete atom from temporary hebrand base
-            for effect in effects:
-                if hebrand.count(variables[abs(effect)][0]):
-                    hebrand.remove(variables[abs(effect)][0])
-                    t = variables[abs(effect)][1]
-
-            # for hebrand base atoms not in action effects, add clause
-            for atom in hebrand:
-                # get index in variables list
-                ind = variables.index((atom, t))
-
-                # create new clauses and add to SAT sentence
-                clause1 = [-action_var, -(ind - 1), ind]
-                clause2 = [-action_var, (ind - 1), -ind]
-                sentence.append(clause1)
-                sentence.append(clause2)
-
-        return sentence
-
-    # ----------------------------------------------------------------------------------------------------------------------
 
     '''Function that adds the conjunctions from one action at time to SAT sentence'''
     def one_action(self, sentence, h):
