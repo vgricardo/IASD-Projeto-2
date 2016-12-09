@@ -49,7 +49,7 @@ class SATInstance:
                         self.add_action(atoms[1:])  # adds the action's preconditions and effects to dictionary table
                         [self.add_constants(atom) for atom in atoms[1:]]  # add action's constants
 
-                        # ----------------------------------------------------------------------------------------------------------------------
+                    # ----------------------------------------------------------------------------------------------------------------------
 
     '''Routine that adds the constants in the problem's domain'''
 
@@ -87,18 +87,18 @@ class SATInstance:
             variables = self.variables
             for i in range(0, len(variables)):
                 if variables[i] == (atom, 0):
-                    indices = [sign * k for k in range(i, i + h)]
+                    indices = [sign * k for k in range(i, i + h + 1)]
                     return indices
 
         else:  # not yet in hebrand base then add atom
             hebrand_base.add(atom)
-            self.add_variable(atom, h)
+            self.add_variable(atom, h + 1)
 
             i = len(self.variables)
-            indices = [sign * k for k in range(i - h, i)]
+            indices = [sign * k for k in range(i - h - 1, i)]
             return indices
 
-            # ----------------------------------------------------------------------------------------------------------------------
+        # ----------------------------------------------------------------------------------------------------------------------
 
     '''Routine that encodes atom'''
 
@@ -120,7 +120,7 @@ class SATInstance:
         for t in range(0, h):
             self.variables.append((atom, t))
 
-            # ----------------------------------------------------------------------------------------------------------------------
+        # ----------------------------------------------------------------------------------------------------------------------
 
     '''Routine that adds the action's effects and preconditions to a dictionary'''
 
@@ -216,8 +216,8 @@ class SATInstance:
         new_action_table = []
         for i in range(0, len(actions)):
 
-            self.add_variable(actions[i], h)  # add ground action to problem's variables
-            temp_actions = [(len(self.variables) - (h - k), ([], [])) for k in range(0, h)]
+            self.add_variable(actions[i], h + 1)  # add ground action to problem's variables
+            temp_actions = [(len(self.variables) - (h - k + 1), ([], [])) for k in range(0, h + 1)]
 
             # define action's preconditions and effects
             precond = action_table[actions[i]][0]
@@ -225,12 +225,12 @@ class SATInstance:
 
             for j in range(0, len(precond)):
                 indices = self.add_hebrand(precond[j], h + 1)  # add action's preconditions
-                for t in range(0, h):
+                for t in range(0, h + 1):
                     temp_actions[t][1][0].append(indices[t])
 
             for j in range(0, len(effect)):
                 indices = self.add_hebrand(effect[j], h + 1)  # add action's effects
-                for t in range(0, h):
+                for t in range(0, h + 1):
                     temp_actions[t][1][1].append(indices[t + 1])
 
             # add actions to new action table
@@ -361,7 +361,7 @@ class SATInstance:
 
         action_table = self.action_table
         variables = self.variables
-        for t in range(0, h):
+        for t in range(0, h + 1):
 
             temp_actions = []
             for action in action_table:

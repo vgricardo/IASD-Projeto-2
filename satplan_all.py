@@ -1,6 +1,5 @@
 import sys
 
-from DPLL import *
 from sat_all import *
 
 
@@ -11,10 +10,10 @@ def main(arg1):
     # initialization of variables
     model = False
     write_sat_sentence = False
-    h_max = 10  # max time horizon
+    h_max = 3  # max time horizon
 
     start_time = time.clock()
-    for h in range(0, h_max + 1):
+    for h in range(0, h_max):
 
         # Create SAT instance(constructor)
         sat = SATInstance()
@@ -43,7 +42,7 @@ def main(arg1):
         symbols = [i for i in range(1, len(sat.variables))]
 
         # Run SAT solver
-        model = dpll_recursive(cnf, symbols)
+        # model = dpll_recursive(cnf, symbols)
         # model = dpll_iterative(cnf, symbols)
 
         if model:  # model found
