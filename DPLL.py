@@ -197,7 +197,8 @@ def dpll_iterative(clauses, symbols):
                 if blevel == 0:  # not possible to backtrack, problem is unfeasible
                     return False
                 else:
-                    backtrack(p, value, symbols, model, clauses, assigned_symbols, modified_clauses, assign_order, status, blevel, status)
+                    backtrack(p, value, symbols, model, clauses, assigned_symbols, modified_clauses, assign_order,
+                              blevel, status)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -207,13 +208,13 @@ def dpll_iterative(clauses, symbols):
 
 def backtrack(p, value, symbols, model, clauses, assigned_symbols, modified_clauses, assign_order, blevel, status):
 
-    clauses.append(status)
-
     if blevel == len(assign_order):
-        if value == True:
+        if value:
             value = False
         else:
             value = True
+            #TODO: correct this assignment
+        clauses.append(status)
         for clause in modified_clauses[p]:
             clauses.append(clause)
         del modified_clauses[p]
@@ -227,6 +228,8 @@ def backtrack(p, value, symbols, model, clauses, assigned_symbols, modified_clau
             del modified_clauses[p]
             assign_order.remove(p)
             p = assign_order[-1]
+            #TODO: assign value
+
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -244,13 +247,16 @@ def analyze_conflict(p, assign_order, assigned_symbols):
             if False in assigned_symbols[p]:
                 p = assign_order[-i - 1]
                 i += 1
+            else:
+                blevel = len(assign_order) - i
+                return blevel
         elif False in assigned_symbols[p]:
             if True in assigned_symbols[p]:
                 p = assign_order[-i - 1]
                 i += 1
-        else:
-            blevel = assign_order - i + 1
-            return blevel
+            else:
+                blevel = len(assign_order) - i
+                return blevel
         if i == len(assign_order):
             return 0
 
@@ -341,8 +347,8 @@ def decide_next_branch(symbols, clauses, model):
         return p, value, False
 
     # Check the most frequent symbol among clauses
-    #p = find_most_used_symbol(symbols, clauses)
-    #return p, True
+    # p = find_most_used_symbol(symbols, clauses)
+    # return p, True
 
     # No pure symbols or unit clauses, get first variable in symbols and assign True
     p = symbols[0]
@@ -364,4 +370,5 @@ def find_most_used_symbol(symbols, clauses):
             m = n
             n = 0
             p = symbol
+
     return p
