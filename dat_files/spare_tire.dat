@@ -1,9 +1,0 @@
-I 	Tire(Flat) 	Tire(Spare) 	At(Flat,Axle) 	At(Spare,Trunk)
-
-G	At(Spare,Axle)
-
-A	Remove(obj,loc):		At(obj,loc)		->		-At(obj,loc)	At(obj,Ground)
-
-A	PutOn(t,Axle):		Tire(t)	At(t,Ground)	-At(Flat,Axle)		->		-At(t,Ground)		At(t,Axle)
-
-A LeaveOvernight:	->		-At(Spare,Ground)	-At(Spare,Axle)	-At(Spare,Trunk)		-At(Flat,Ground)		-At(Flat,Axle)		-At(Flat,Trunk)

@@ -45,7 +45,7 @@ class SATInstance:
                             self.goal_state.append([indices[-1]])  # save variable id, accounting for atom sign
 
                     elif atoms[0] == 'A':  # line with an action description
-                        atoms[1] = atoms[1][:-1]  # delete ':' sign in the action name
+                        atoms.remove(':')  # delete ':' sign in the action name
                         self.add_action(atoms[1:])  # adds the action's preconditions and effects to dictionary table
                         [self.add_constants(atom) for atom in atoms[1:]]  # add action's constants
 
@@ -165,7 +165,7 @@ class SATInstance:
             # get terms in action name
             action = actions[ind]
             terms = action.split()
-            for variable in terms:
+            for variable in terms[1:]:
                 if variable.islower():
                     break
             else:
@@ -344,6 +344,38 @@ class SATInstance:
             for atom in hebrand:
                 # get index in variables list
                 ind = variables.index((atom, t))
+
+                # create new clauses and add to SAT sentence
+                clause1 = [-action_var, -(ind - 1), ind]
+                clause2 = [-action_var, (ind - 1), -ind]
+                sentence.append(clause1)
+                sentence.append(clause2)
+
+        return sentence
+
+    # ----------------------------------------------------------------------------------------------------------------------
+
+    '''Function that adds the frame axioms to the SAT sentence'''
+
+    def explan_frame_axioms(self, sentence):
+
+        # the frame axioms in CNF form are one clause with the negation of the action and precondition
+        # and also the term with the effect not negated
+        action_table = self.action_table
+        variables = self.variables
+        for action_var in action_table:
+
+            # get action's effects from table
+            action = action_table[action_var]
+            effects = action[1]
+
+            t = 0
+            # remove '-' sign from effects and delete atom from temporary hebrand base
+            for effect in effects:
+                ind = variables[abs(effect)][1]
+
+                # for hebrand base atoms not in action effects, add clause
+
 
                 # create new clauses and add to SAT sentence
                 clause1 = [-action_var, -(ind - 1), ind]
