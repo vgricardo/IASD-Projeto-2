@@ -16,17 +16,18 @@ def main(arg1):
 
     start_time = time.clock()
     # Read information from .dat file
-    sat.read_file(filename, h_max)
+    sat.read_file(filename)
+
+    # Ground all the actions
+    sat.ground_actions()
 
     # SAT_Plan algorithm
     model = False
-    for h in range(h_max, h_max + 1):
-
-        # Ground all the actions
-        sat.ground_actions(h_max)
+    cnf = []
+    for h in range(0, h_max):
 
         # Linear encoding
-        cnf = sat.linear_encoding(h)
+        cnf = sat.linear_encoding(cnf, h)
 
         # # print SAT sentence to terminal
         # [print(i, ': ', sentence[i]) for i in range(0, len(sentence))]
@@ -40,7 +41,7 @@ def main(arg1):
 
         # get symbols used in sat sentence
         symbols = [i for i in range(1, len(sat.variables))]
-        print('Encoding Time: %.6f' % (time.clock() - start_time))
+    print('Encoding Time: %.6f' % (time.clock() - start_time))
 
         #     # Run SAT solver
         #     model = dpll_recursive(cnf, symbols)
