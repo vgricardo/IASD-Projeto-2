@@ -1,8 +1,5 @@
-import time
-
 """File with the sat solver functions"""
-# TODO: DPLL finish iterative and include improvements
-# ----------------------------------------------------------------------------------------------------------------------
+
 # ----------------------------------------------------------------------------------------------------------------------
 
 ''' Main DPLL sat solver function'''
@@ -58,7 +55,6 @@ def dpll(clauses, symbols, model):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
 
 '''Function that sees if the clauses are true in a partial model, returns true if clause is satisfied,
 false if not, and None if is not yet possible to determine the truth value of the clause'''
@@ -82,47 +78,6 @@ def check_clause(clause, model):
         return None
     else:
         return False
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-
-"""Function that finds a symbol and its value if it appears only as a positive literal
-    (or only as a negative) in clauses, returning symbol and corresponding Truth value"""
-
-
-def find_pure_symbol(symbols, clauses):
-    for symbol in symbols:
-
-        # Boolean variables used to determine if pure symbol is found
-        pos_found, neg_found = False, False
-
-        for clause in clauses:
-
-            if not pos_found and symbol in clause:
-                pos_found = True  # positive symbol found in clause
-
-            if not neg_found and -symbol in clause:
-                neg_found = True  # negative symbol found in clause
-
-        if pos_found != neg_found:  # if a pure symbol is found, return it
-            return symbol, pos_found
-
-    return None, None  # No pure symbols
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-
-"""Function that does a forced assignment if a clause with only 1 variable is found"""
-
-
-def find_unit_clause(clauses, model):
-    for clause in clauses:
-        p, value = unit_clause_assign(clause, model)  # search and get unit clause if exists
-        if p:
-            return p, value
-
-    # no unit clauses found
-    return None, None
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -169,79 +124,229 @@ def extend_model(model, symbol, value):
     model[symbol] = value
     return model
 
-# ----------------------------------------------------------------------------------------------------------------------
+
 # ----------------------------------------------------------------------------------------------------------------------
 
 """DPLL algorithm, iterative implementation"""
 
 
 def dpll_iterative(clauses, symbols):
+
     # Initializations
     model = dict()
     assigned_symbols = dict()
     modified_clauses = dict()
+    clause_first_modifier = dict()
     assign_order = []
 
     while True:
-        p, value, pure = decide_next_branch(symbols, clauses, model)
+        p, value, kind = decide_next_branch(symbols, clauses, model)
 
         while True:
-            status = deduce(p, value, pure, symbols, model, clauses, assigned_symbols, modified_clauses, assign_order)
+            status = deduce(p, value, kind, clauses, symbols, model, assigned_symbols, modified_clauses, assign_order,
+                            clause_first_modifier)
             if status is True:  # SAT is satisfied with current model
                 return model
-            elif status is None:  # need to assign other variable
+            elif status is None:    # need to assign other variable
                 break
-            else:  # some conflict occurred
-                # analyze conflict
-                blevel = analyze_conflict(p, assign_order, assigned_symbols)
+            else:   # some conflict occurred
+                blevel = analyze_conflict(p, assign_order, assigned_symbols)    # find backtrack level
                 if blevel == 0:  # not possible to backtrack, problem is unfeasible
                     return False
-                else:
-                    backtrack(p, value, symbols, model, clauses, assigned_symbols, modified_clauses, assign_order,
-                              blevel, status)
+                else:   # backtrack to backtrack level
+                    p, value = backtrack(p, value, clauses, symbols, model, assigned_symbols, modified_clauses,
+                                         assign_order, blevel, status, clause_first_modifier)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-"""CBacktrack"""
+"""Choose next assigned symbol, assigning True to a symbol"""
 
 
-def backtrack(p, value, symbols, model, clauses, assigned_symbols, modified_clauses, assign_order, blevel, status):
+def decide_next_branch(symbols, clauses, model):
 
-    if blevel == len(assign_order):
-        if value:
-            value = False
-        else:
-            value = True
-            #TODO: correct this assignment
-        clauses.append(status)
-        for clause in modified_clauses[p]:
-            clauses.append(clause)
-        del modified_clauses[p]
+    p, value = find_pure_symbol(symbols, clauses)   # Check for pure symbols
+    if p:  # pure symbol is found
+        return p, value, 'pure'
+
+    p, value = find_unit_clause(clauses, model)     # Check for unit clauses
+    if p:  # unit clause is found
+        return p, value, 'unit'
+
+    # p, value = find_most_used_symbol(symbols, clauses)   # Check the most frequent symbol among clauses
+    # return p, value, False
+
+    p = symbols[0]  # No pure symbols or unit clauses, get first variable in symbols and assign True
+    return p, True, False
+
+# ----------------------------------------------------------------------------------------------------------------------
+
+"""Function that finds a symbol and its value if it appears only as a positive literal
+    (or only as a negative) in clauses, returning symbol and corresponding Truth value"""
+
+
+def find_pure_symbol(symbols, clauses):
+
+    for symbol in symbols:
+
+        pos_found, neg_found = False, False     # Boolean variables used to determine if pure symbol is found
+
+        for clause in clauses:
+
+            if not pos_found and symbol in clause:
+                pos_found = True  # positive symbol found in clause
+
+            if not neg_found and -symbol in clause:
+                neg_found = True  # negative symbol found in clause
+
+        if pos_found != neg_found:  # if a pure symbol is found, return it
+            return symbol, pos_found
+
+    return None, None  # No pure symbols
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+
+"""Function that does a forced assignment if a clause with only 1 variable is found"""
+
+
+def find_unit_clause(clauses, model):
+
+    for clause in clauses:
+
+        p, value = unit_clause_assign(clause, model)  # search and get unit clause if exists
+
+        if p:
+            return p, value
+
+    return None, None   # no unit clauses found
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+
+"""Function that choose the symbol that occurs most frequently"""   # TODO: comment this function
+
+
+def find_most_used_symbol(symbols, clauses):
+    p = symbols[0]
+    value = True
+    n = 0
+    m = 0
+    t = 0
+    f = 0
+    for symbol in symbols:
+        for clause in clauses:
+            if symbol in clause:
+                n += 1
+                t +=1
+            if -symbol in clause:
+                n += 1
+                f += 1
+        if n > m:
+            m = n
+            n = 0
+            p = symbol
+            if f > t:
+                value = False
+            t = 0
+            f = 0
+
+    return p, value
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+
+"""Function that applies unit propagation, keeping track of conflicts"""
+
+
+def deduce(p, value, kind, symbols, model, clauses, assigned_symbols, modified_clauses, assign_order,
+           clause_first_modifier):
+
+    update_information(p, value, kind, symbols, model, assigned_symbols, assign_order)  # updating information of p
+
+    i = 0   # iterator in clauses
+
+    while True:     # unit propagation of assignment
+
+        if i == len(clauses):  # all clauses analyzed
+            return None
+
+        clause = clauses[i]
+        clause_changed = False
+        temp_clause = clause[:]
+
+        for literal in clause:
+
+            if abs(literal) == p:  # symbol p is found in clause
+
+                if (literal > 0 and value) or (
+                        literal < 0 and not value):  # symbol is true, making clause true
+                    clauses.remove(clause)
+                    clause_changed = True
+                    break
+
+                else:  # literal is false in clause, can be eliminated from it
+                    clause.remove(literal)
+                    clause_changed = True
+                    break
+
+        i += 1  # move to next clause
+
+        if len(clauses) == 0:   # problem is satisfiable
+            return True
+
+        if clause_changed:  # add clause to modified clauses
+            if clause_first_modifier.get(temp_clause):
+                clause_first_modifier.setdefault(clause, clause_first_modifier[temp_clause])
+            else:
+                clause_first_modifier.setdefault(temp_clause, p)
+                clause_first_modifier.setdefault(clause, clause_first_modifier[temp_clause])
+            if modified_clauses.get(p):
+                modified_clauses[p].append(temp_clause)
+            else:
+                modified_clauses.setdefault(p, [temp_clause])
+
+        if len(clause) == 0:  # check if clause is unsatisfiable
+            return False
+
+# ----------------------------------------------------------------------------------------------------------------------
+
+"""Function that updates information for p assignment"""
+
+
+def update_information(p, value, kind, symbols, model, assigned_symbols, assign_order):
+
+    if abs(p) in symbols:
+        symbols.remove(p)   # remove symbol p from symbols to assign
+
+    if abs(p) not in assign_order:
+        assign_order.append(p)  # include symbol p as the last assigned symbol
+
+    model[p] = value    # include truth value of p in model
+
+    if assigned_symbols.get(p):     # update values already assigned to symbols
+        assigned_symbols[p].append(value)   # only occurs if the p is not pure or doesn't belong to unit clause
+
     else:
-        while blevel != len(assign_order):
-            symbols.append(p)
-            del model[p]
-            del assigned_symbols[p]
-            for clause in modified_clauses[p]:
-                clauses.append(clause)
-            del modified_clauses[p]
-            assign_order.remove(p)
-            p = assign_order[-1]
-            #TODO: assign value
+        assigned_symbols.setdefault(p, [value])
 
+        if kind is not False:    # pure or unit information will be used to optimize backtrack process
+            assigned_symbols[p].append(kind)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-"""Routine responsible for analyzing the conflict that appeared"""
+"""Routine responsible for analyzing the conflict that appeared"""    # TODO: comment this function
 
 
 def analyze_conflict(p, assign_order, assigned_symbols):
     i = 0
     while True:
         if 'pure' in assigned_symbols[p]:
-            p = assign_order[-i-1]
+            p = assign_order[-i - 1]
+            i += 1
+        elif 'unit' in assigned_symbols[p]:
+            p = assign_order[-i - 1]
             i += 1
         elif True in assigned_symbols[p]:
             if False in assigned_symbols[p]:
@@ -263,112 +368,36 @@ def analyze_conflict(p, assign_order, assigned_symbols):
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-"""Function that applies unit propagation, keeping track of conflicts"""
+"""CBacktrack"""    # TODO: comment this function
 
 
-def deduce(p, value, pure, symbols, model, clauses, assigned_symbols, modified_clauses, assign_order):
-    # updating information for assignment of p
-    update_information(p, value, pure, symbols, model, assigned_symbols, assign_order)
+def backtrack(p, value, symbols, model, clauses, assigned_symbols, modified_clauses, assign_order, blevel, status,
+              clause_first_modifier):
 
-    i = 0  # iterator in clauses
-    # unit propagation of assignment
-    while True:
-
-        if i == len(clauses):  # all clauses analyzed
-            return None
-
-        clause = clauses[i]
-        clause_changed = False
-        temp_clause = clause[:]
-        for literal in clause:
-
-            if abs(literal) == p:  # symbol p is found in clause
-                if (literal > 0 and value) or (literal < 0 and not value):  # symbol is true, making clause true
-                    clauses.remove(clause)
-                    clause_changed = True
-                    break
-
-                else:  # literal is false in clause, can be eliminated from it
-                    clause.remove(literal)
-                    clause_changed = True
-                    if len(clause) == 0:  # check if clause is unsatisfiable
-                        return temp_clause
-                    break
-        else:
-            i += 1  # move to next clause
-
-        if len(clauses) == 0:  # problem is satisfiable
-            return True
-
-        if clause_changed:  # add clause to modified clauses
-            if modified_clauses.get(p):
-                modified_clauses[p].append(temp_clause)
-            else:
-                modified_clauses.setdefault(p, [temp_clause])
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-
-"""Function that updates information for p assignment"""
-
-
-def update_information(p, value, pure, symbols, model, assigned_symbols, assign_order):
-    if abs(p) in symbols:
-        symbols.remove(p)  # remove symbols from symbols to assign
-    if abs(p) not in assign_order:
-        assign_order.append(p)  # include last assigned
-
-    model[p] = value  # include truth value in model
-
-    # update values already assigned to symbols
-    if assigned_symbols.get(p):
-        assigned_symbols[p].append(value)
-        if pure:
-            assigned_symbols[p].append('pure')
+    i = len(assign_order)   # blevel iterator
+    if blevel == len(assign_order):
+        value = not value
+        clauses.append(status)
+        for clause in modified_clauses[p]:
+            clauses.append(clause)
+        del modified_clauses[p]
+        return p, value
     else:
-        assigned_symbols.setdefault(p, [value])
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-
-"""Choose next assigned symbol, assigning True to a symbol"""
-
-
-def decide_next_branch(symbols, clauses, model):
-
-    # Check for pure symbols
-    p, value = find_pure_symbol(symbols, clauses)
-    if p:  # pure symbol is found
-        return p, value, True
-
-    # Check for unit clauses
-    p, value = find_unit_clause(clauses, model)
-    if p:  # unit clause is found
-        return p, value, False
-
-    # Check the most frequent symbol among clauses
-    # p = find_most_used_symbol(symbols, clauses)
-    # return p, True
-
-    # No pure symbols or unit clauses, get first variable in symbols and assign True
-    p = symbols[0]
-    return p, True, False
-
-# ----------------------------------------------------------------------------------------------------------------------
-
-"""Function that choose the symbol that occurs most frequently"""
-
-
-def find_most_used_symbol(symbols, clauses):
-    n = 0
-    m = 0
-    for symbol in symbols:
-        for clause in clauses:
-            if symbol in clause or -symbol in clause:
-                n += 1
-        if n > m:
-            m = n
-            n = 0
-            p = symbol
-
-    return p
+        p = assign_order[blevel]
+        if True in assigned_symbols[p]:
+            value = False
+        else:
+            value = True
+        while blevel != i:
+            s = assign_order[blevel]
+            symbols.append(s)
+            del model[s]
+            del assigned_symbols[s]
+            for clause in modified_clauses[s]:
+                if clause_first_modifier[clause] == s:
+                    clauses.append(clause)
+                del clause_first_modifier[clause]
+            del modified_clauses[s]
+            assign_order.remove(p)
+            blevel += 1
+        return p, value
