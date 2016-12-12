@@ -2,10 +2,8 @@ import copy
 import time
 
 
-# TODO: update sat encoding to incremental form and include improvements
 # ----------------------------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
-
 
 class SATInstance:
     """Class defining a SAT problem instance"""
@@ -18,8 +16,8 @@ class SATInstance:
         self.hebrand = set()  # saves the hebrand base
         self.variables = [None]  # keeps the information of problem's variables
 
-    # ----------------------------------------------------------------------------------------------------------------------
-    # ----------------------------------------------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------------------------------------------
 
     '''Routine to read the information from .dat file'''
 
@@ -49,7 +47,9 @@ class SATInstance:
                         self.add_action(atoms[1:])  # adds the action's preconditions and effects to dictionary table
                         [self.add_constants(atom) for atom in atoms[1:]]  # add action's constants
 
-                    # ----------------------------------------------------------------------------------------------------------------------
+        return
+
+    # ------------------------------------------------------------------------------------------------------------------
 
     '''Routine that adds the constants in the problem's domain'''
 
@@ -66,7 +66,7 @@ class SATInstance:
 
         return atom
 
-    # ----------------------------------------------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------------------------------------------
 
     '''Function that adds atom to hebrand base and variable list if necessary'''
 
@@ -98,7 +98,9 @@ class SATInstance:
             indices = [sign * k for k in range(i - h - 1, i)]
             return indices
 
-        # ----------------------------------------------------------------------------------------------------------------------
+        return
+
+    # ------------------------------------------------------------------------------------------------------------------
 
     '''Routine that encodes atom'''
 
@@ -111,7 +113,7 @@ class SATInstance:
 
         return atom
 
-    # ----------------------------------------------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------------------------------------------
 
     '''Function responsible for adding a problem's variable into variable_list, including time steps'''
 
@@ -120,7 +122,9 @@ class SATInstance:
         for t in range(0, h):
             self.variables.append((atom, t))
 
-        # ----------------------------------------------------------------------------------------------------------------------
+        return
+
+    # ------------------------------------------------------------------------------------------------------------------
 
     '''Routine that adds the action's effects and preconditions to a dictionary'''
 
@@ -131,8 +135,10 @@ class SATInstance:
         # fill the dictionary with the action's information
         self.action_table[atoms[0]] = (atoms[1:split_ind], atoms[split_ind + 1:])
 
-    # ----------------------------------------------------------------------------------------------------------------------
-    # ----------------------------------------------------------------------------------------------------------------------
+        return
+
+    # ------------------------------------------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------------------------------------------
 
     '''Routine responsible for grounding all the actions(replace variables by all constants)'''
 
@@ -144,11 +150,11 @@ class SATInstance:
         # remove parenthesis and comas from actions
         for i in range(0, len(actions)):
             name = actions[i]
+            action = action_table.pop(name)  # get action description
 
             # remove from action's name
-            actions[i] = self.encode_atom(actions[i])
+            actions[i] = self.encode_atom(name)
 
-            action = action_table.pop(name)  # get action description
             for j in range(0, len(action[0])):
                 action[0][j] = self.encode_atom(action[0][j])  # remove from action preconditions
 
@@ -170,7 +176,9 @@ class SATInstance:
                     break
             else:
                 if ind == (len(actions) - 1):  # leave the loop because all actions were grounded
-                    action_table = self.add_action_hebrand(action_table, actions, h)  # add action atoms to Hebrand base
+
+                    # add action atoms to hebrand base
+                    action_table = self.add_action_hebrand(action_table, actions, h)
                     break
                 else:
                     ind += 1  # ground the next original action
@@ -207,43 +215,75 @@ class SATInstance:
         self.action_table.clear()
         self.action_table.update(dict(action_table))
 
-    # ----------------------------------------------------------------------------------------------------------------------
+        return
 
-    '''Routine responsible for adding the action's atoms to the Hebrand base'''
+    # ------------------------------------------------------------------------------------------------------------------
+
+    '''Routine responsible for adding the action's atoms to the hebrand base
+       deleting impossible actions, and encode actions in variables indices'''
 
     def add_action_hebrand(self, action_table, actions, h):
 
         new_action_table = []
-        for i in range(0, len(actions)):
+        i = 0  # iterator in action names
+        while True:
+
+            if i == len(actions):  # all actions were operated
+                break
 
             self.add_variable(actions[i], h + 1)  # add ground action to problem's variables
             temp_actions = [(len(self.variables) - (h - k + 1), ([], [])) for k in range(0, h + 1)]
 
-            # define action's preconditions and effects
-            precond = action_table[actions[i]][0]
-            effect = action_table[actions[i]][1]
+            # replace action's preconditions and effects and eliminate action if impossible
+            # (i.e. have contradictory effects)
 
+            # replace preconditions
+            precond = action_table[actions[i]][0]
             for j in range(0, len(precond)):
                 indices = self.add_hebrand(precond[j], h + 1)  # add action's preconditions
                 for t in range(0, h + 1):
                     temp_actions[t][1][0].append(indices[t])
 
+            # replace effects
+            effect = action_table[actions[i]][1]
             for j in range(0, len(effect)):
                 indices = self.add_hebrand(effect[j], h + 1)  # add action's effects
                 for t in range(0, h + 1):
                     temp_actions[t][1][1].append(indices[t + 1])
 
-            # add actions to new action table
-            new_action_table.extend(temp_actions)
+            # check and eliminate action if is impossible
+            if not self.impos_action(temp_actions[0][0], i, temp_actions[0][1][1], h, actions):
+                # add actions to new action table
+                new_action_table.extend(temp_actions)
+                i += 1
 
         return new_action_table
 
-    # ----------------------------------------------------------------------------------------------------------------------
-    # ----------------------------------------------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------------------------------------------
+
+    """Function that checks and removes the impossible actions(i.e. with effects -e and e for the same time step)"""
+
+    def impos_action(self, action, action_pos, effects, h, actions):
+
+        # check if there are contradictory effects
+        for i in range(0, len(effects)):
+            for j in range(i + 1, len(effects)):
+
+                if effects[i] == -effects[j]:
+                    del actions[action_pos]  # delete from list of actions
+                    for t in range(0, h + 1):
+                        del self.variables[action]  # remove impossible action from variables
+
+                    return True
+
+        return False
+
+    # ------------------------------------------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------------------------------------------
 
     '''Function responsible to perform the linear encoding of the SAT problem'''
 
-    def linear_encoding(self, h):  # h represents the time horizon
+    def encoding(self, h):  # h represents the time horizon
 
         sentence = []
 
@@ -265,7 +305,7 @@ class SATInstance:
 
         return sentence
 
-    # ----------------------------------------------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------------------------------------------
 
     '''Routine introducing the remaining atom in the linear encoding formulation'''
 
@@ -287,7 +327,7 @@ class SATInstance:
 
         return sentence
 
-    # ----------------------------------------------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------------------------------------------
 
     '''Function that removes the implications from the actions and translates them into CNF form'''
 
@@ -315,7 +355,7 @@ class SATInstance:
 
         return sentence
 
-    # ----------------------------------------------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------------------------------------------
 
     '''Function that adds the frame axioms to the SAT sentence'''
 
@@ -353,39 +393,7 @@ class SATInstance:
 
         return sentence
 
-    # ----------------------------------------------------------------------------------------------------------------------
-
-    '''Function that adds the frame axioms to the SAT sentence'''
-
-    def explan_frame_axioms(self, sentence):
-
-        # the frame axioms in CNF form are one clause with the negation of the action and precondition
-        # and also the term with the effect not negated
-        action_table = self.action_table
-        variables = self.variables
-        for action_var in action_table:
-
-            # get action's effects from table
-            action = action_table[action_var]
-            effects = action[1]
-
-            t = 0
-            # remove '-' sign from effects and delete atom from temporary hebrand base
-            for effect in effects:
-                ind = variables[abs(effect)][1]
-
-                # for hebrand base atoms not in action effects, add clause
-
-
-                # create new clauses and add to SAT sentence
-                clause1 = [-action_var, -(ind - 1), ind]
-                clause2 = [-action_var, (ind - 1), -ind]
-                sentence.append(clause1)
-                sentence.append(clause2)
-
-        return sentence
-
-    # ----------------------------------------------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------------------------------------------
 
     '''Function that adds the conjunctions from one action at time to SAT sentence'''
 
@@ -411,14 +419,14 @@ class SATInstance:
 
         return sentence
 
-    # ----------------------------------------------------------------------------------------------------------------------
-    # ----------------------------------------------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------------------------------------------
 
     """Function responsible for writing SAT sentence formulation into file, using DIMACS syntax"""
 
     def write_dimacs(self, sentence, filename, start_time, h):
 
-        f = open('dimacs_' + str(h) + '.dat', 'w')
+        f = open('dimacs_files/' + 'dimacs' + str(h + 1) + '.dat', 'w')
 
         # write comment lines with problem's description
         f.write(('c DIMACS syntax for problem in file: ' + filename + '\n'))
@@ -452,8 +460,10 @@ class SATInstance:
         f.write(output)
         f.close()
 
-    # ----------------------------------------------------------------------------------------------------------------------
-    # ----------------------------------------------------------------------------------------------------------------------
+        return
+
+    # ------------------------------------------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------------------------------------------
 
     """Function used to write solution on the terminal"""
 
@@ -475,6 +485,8 @@ class SATInstance:
         # print in terminal
         for action in solution:
             print(action[0])
+
+        return
 
 # ----------------------------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
