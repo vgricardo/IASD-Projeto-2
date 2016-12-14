@@ -141,7 +141,6 @@ def dpll_iterative(clauses, symbols):
 
     while True:
         p, value, kind = decide_next_branch(symbols, clauses, model)
-
         while True:
             status = deduce(p, value, kind, clauses, symbols, model, assigned_symbols, modified_clauses, assign_order,
                             clause_first_modifier)
