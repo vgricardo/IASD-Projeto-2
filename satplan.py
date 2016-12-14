@@ -1,6 +1,7 @@
 import sys
 
-from sat_linear import *
+from DPLL import *
+from sat_explan import *
 
 
 def main(arg1):
@@ -9,7 +10,7 @@ def main(arg1):
 
     # initialization of variables
     model = False
-    write_sat_sentence = False  # write DIMACS file
+    write_sat_sentence = True  # write DIMACS file
     h_max = 3  # max time horizon
 
     start_time = time.clock()
@@ -35,11 +36,11 @@ def main(arg1):
         symbols = [i for i in range(1, len(sat.variables))]
 
         # Run SAT solver
-        # model = dpll_recursive(cnf, symbols)
+        model = dpll_recursive(cnf, symbols)
         # model = dpll_iterative(cnf, symbols)
 
         if model:  # model found
-            sat.write_solution(model, h)  # write solution to terminal
+            sat.write_solution(model)  # write solution to terminal
             break
 
     if not model:  # problem is unfeasible

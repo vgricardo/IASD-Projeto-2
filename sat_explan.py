@@ -374,7 +374,7 @@ class SATInstance:
         sentence = self.explan_frame_axioms(sentence)
 
         # part 5 of linear encoding, in accordance with the handout
-        sentence = self.conflict_exclusion(sentence, h)
+        # sentence = self.conflict_exclusion(sentence, h)
 
         return sentence
 
@@ -559,7 +559,7 @@ class SATInstance:
         f.write('c \n')
 
         # create variable list (ground atoms in hebrand base plus all ground actions)
-        variables = len(self.variables)  # number of variables (size of variable_list)
+        variables = len(self.variables) - 1  # number of variables
         clauses = len(sentence)  # number of clauses (size of sentence)
 
         # write problem line

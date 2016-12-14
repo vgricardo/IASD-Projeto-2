@@ -411,7 +411,7 @@ class SATInstance:
         sentence = self.explan_frame_axioms(sentence)
 
         # part 5 of linear encoding, in accordance with the handout
-        sentence = self.complete_exclusion(sentence, h)
+        # sentence = self.complete_exclusion(sentence, h)
 
         return sentence
 
