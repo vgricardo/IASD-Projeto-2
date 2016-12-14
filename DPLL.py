@@ -173,11 +173,11 @@ def decide_next_branch(symbols, clauses, model):
     if p:  # unit clause is found
         return p, value, 'unit'
 
-    # p, value = find_most_used_symbol(symbols, clauses)   # Check the most frequent symbol among clauses
-    # return p, value, False
+    p, value = find_most_used_symbol(symbols, clauses)   # Check the most frequent symbol among clauses
+    return p, value, False
 
-    p = symbols[0]  # No pure symbols or unit clauses, get first variable in symbols and assign True
-    return p, True, False
+    # p = symbols[0]  # No pure symbols or unit clauses, get first variable in symbols and assign True
+    # return p, True, False
 
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -238,7 +238,7 @@ def find_most_used_symbol(symbols, clauses):
         for clause in clauses:
             if symbol in clause:
                 n += 1
-                t +=1
+                t += 1
             if -symbol in clause:
                 n += 1
                 f += 1
@@ -259,7 +259,7 @@ def find_most_used_symbol(symbols, clauses):
 """Function that applies unit propagation, keeping track of conflicts"""
 
 
-def deduce(p, value, kind, symbols, model, clauses, assigned_symbols, modified_clauses, assign_order,
+def deduce(p, value, kind, clauses, symbols, model, assigned_symbols, modified_clauses, assign_order,
            clause_first_modifier):
 
     update_information(p, value, kind, symbols, model, assigned_symbols, assign_order)  # updating information of p
@@ -296,11 +296,10 @@ def deduce(p, value, kind, symbols, model, clauses, assigned_symbols, modified_c
             return True
 
         if clause_changed:  # add clause to modified clauses
-            if clause_first_modifier.get(temp_clause):
-                clause_first_modifier.setdefault(clause, clause_first_modifier[temp_clause])
-            else:
-                clause_first_modifier.setdefault(temp_clause, p)
-                clause_first_modifier.setdefault(clause, clause_first_modifier[temp_clause])
+            if tuple(temp_clause) not in clause_first_modifier:
+                clause_first_modifier[tuple(temp_clause)] = p
+            if temp_clause != clause:
+                clause_first_modifier[tuple(clause)] = clause_first_modifier[tuple(temp_clause)]
             if modified_clauses.get(p):
                 modified_clauses[p].append(temp_clause)
             else:
