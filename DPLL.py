@@ -188,14 +188,10 @@ def decide_next_branch(symbols, clauses, model):
 def find_pure_symbol(symbols, clauses):
 
     for symbol in symbols:
-
         pos_found, neg_found = False, False     # Boolean variables used to determine if pure symbol is found
-
         for clause in clauses:
-
             if not pos_found and symbol in clause:
                 pos_found = True  # positive symbol found in clause
-
             if not neg_found and -symbol in clause:
                 neg_found = True  # negative symbol found in clause
 
@@ -213,9 +209,7 @@ def find_pure_symbol(symbols, clauses):
 def find_unit_clause(clauses, model):
 
     for clause in clauses:
-
         p, value = unit_clause_assign(clause, model)  # search and get unit clause if exists
-
         if p:
             return p, value
 
@@ -274,23 +268,23 @@ def deduce(p, value, kind, clauses, symbols, model, assigned_symbols, modified_c
         clause = clauses[i]
         clause_changed = False
         temp_clause = clause[:]
+        test_clause = clause[:]
 
         for literal in clause:
-
             if abs(literal) == p:  # symbol p is found in clause
-
                 if (literal > 0 and value) or (
                         literal < 0 and not value):  # symbol is true, making clause true
                     clauses.remove(clause)
                     clause_changed = True
                     break
-
                 else:  # literal is false in clause, can be eliminated from it
+                    test_clause.remove(literal)
+                    if test_clause in clauses:
+                        clauses.remove(clause)
                     clause.remove(literal)
                     clause_changed = True
+                    i += 1  # move to next clause
                     break
-
-        i += 1  # move to next clause
 
         if len(clauses) == 0:   # problem is satisfiable
             return True
@@ -304,7 +298,8 @@ def deduce(p, value, kind, clauses, symbols, model, assigned_symbols, modified_c
                 modified_clauses[p].append(temp_clause)
             else:
                 modified_clauses.setdefault(p, [temp_clause])
-
+        else:
+            i += 1
         if len(clause) == 0:  # check if clause is unsatisfiable
             return False
 
@@ -325,10 +320,8 @@ def update_information(p, value, kind, symbols, model, assigned_symbols, assign_
 
     if assigned_symbols.get(p):     # update values already assigned to symbols
         assigned_symbols[p].append(value)   # only occurs if the p is not pure or doesn't belong to unit clause
-
     else:
         assigned_symbols.setdefault(p, [value])
-
         if kind is not False:    # pure or unit information will be used to optimize backtrack process
             assigned_symbols[p].append(kind)
 
